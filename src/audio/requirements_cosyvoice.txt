@@ -1,0 +1,19 @@
+# ==========================================
+# CosyVoice 专属依赖 (Audio & TTS)
+# ==========================================
+# 只有在启用 CosyVoice 模式时才需要安装这些
+# 核心环境 (Torch/Numpy) 默认继承自主环境
+
+librosa==0.10.2
+soundfile==0.12.1
+resampy
+pydub
+pyworld==0.3.4
+conformer==0.3.2
+wetext==0.0.4
+HyperPyYAML==1.2.1
+inflect==7.3.1
+openai-whisper
+protobuf==4.25
+pyarrow
+matplotlib
