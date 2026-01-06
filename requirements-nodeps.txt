@@ -1,0 +1,5 @@
+filterpy       # facexlib 核心依赖
+numba          # 也是 facexlib 需要的
+facexlib
+gfpgan
+basicsr
