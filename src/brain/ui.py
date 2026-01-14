@@ -20,16 +20,8 @@ def build_brain_ui():
             bubble_full_width=False
         )
         
-        # 2. [新增] 语音播放器 (放在聊天框下面)
-        # autoplay=True 保证合成完自动播放
-        audio_player = gr.Audio(
-            label="🔊 语音输出", 
-            autoplay=True, 
-            interactive=False,
-            visible=True # 你可以选择 False 让它隐藏，只听声音
-        )
 
-        # 3. 输入区
+        # 2. 输入区
         with gr.Row():
             msg_input = gr.Textbox(placeholder="请输入指令...", scale=9, autofocus=True)
             submit_btn = gr.Button("发送", variant="primary", scale=1)
@@ -37,7 +29,7 @@ def build_brain_ui():
         clear_btn = gr.Button("🗑️ 清空记忆")
 
     # 返回 audio_player 供主程序连线
-    return chatbot, msg_input, submit_btn, clear_btn, audio_player
+    return chatbot, msg_input, submit_btn, clear_btn
 
 # ... (user_input_handler 和 brain_think_handler 逻辑保持不变，不需要改) ...
 # 为了完整性，这里列出 handler 的引用，实际代码请保留之前的逻辑

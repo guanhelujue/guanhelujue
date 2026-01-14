@@ -5,10 +5,10 @@ import re
 from .factory import AudioEngineFactory
 from src.utils import load_tts_settings, save_tts_settings
 from .downloader import MODEL_MAP, download_model_handler
+from .patcher import patch_cosyvoice_code
 
 # 全局变量
 _tts_instance = None
-# 占位符
 PLACEHOLDER_TEXT = "暂无模型-请先下载"
 
 def get_tts():
@@ -17,33 +17,40 @@ def get_tts():
     return _tts_instance
 
 # ==========================================
-# 1. 路径与扫描逻辑
+# 1. 路径与扫描逻辑 (关键修复点)
 # ==========================================
 
 def get_models_root(engine_type):
-    base = os.path.join("assets", "models")
+    """
+    获取模型根目录
+    """
+    # 当前文件在 src/audio/ui.py
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
     if engine_type == "CosyVoice":
-        specific_dir = os.path.join(base, "CosyVoice")
-        return specific_dir if os.path.exists(specific_dir) else base
+        # ✅ 修正：直接拼接 cosyvoice，不要再加 audio
+        # 目标: src/audio/cosyvoice/pretrained_models
+        return os.path.join(current_dir, "cosyvoice", "pretrained_models")
+        
     elif engine_type == "GPT-SoVITS":
-        return os.path.join(base, "GPT-SoVITS")
-    return base
+        return os.path.join(current_dir, "gpt_sovits", "pretrained_models")
+    
+    # 默认回退
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    return os.path.join(project_root, "assets", "models")
 
 def scan_models(engine_type):
     if engine_type == "GPT-SoVITS": 
         return ["GPT-SoVITS-暂未支持"]
         
     root = get_models_root(engine_type)
-    if not os.path.exists(root): 
-        try:
-            os.makedirs(root, exist_ok=True)
-        except Exception:
-            pass
     
-    if os.path.exists(root):
-        dirs = [d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
-    else:
-        dirs = []
+    # 如果目录不存在，说明源码没装或者没模型
+    if not os.path.exists(root): 
+        return [PLACEHOLDER_TEXT]
+    
+    # 扫描文件夹
+    dirs = [d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d))]
     
     if not dirs:
         return [PLACEHOLDER_TEXT]
@@ -55,7 +62,7 @@ def get_full_model_path(engine_type, model_name):
     return os.path.abspath(os.path.join(root, model_name))
 
 # ==========================================
-# 2. 各种 Handler
+# 2. 各种 Handler (保持不变)
 # ==========================================
 
 def on_engine_change(engine_type):
@@ -124,6 +131,20 @@ def load_and_save_stream_handler(engine_type, model_name, ref_audio, ref_text):
     log_content = f"--- 开始加载流程 ---\n{save_msg}\n引擎: {engine_type}\n模型: {model_name}\n"
     yield log_content, "⏳ 准备中..."
 
+    # ================= 🚀 新增：调用 patcher 进行修复 =================
+    if engine_type == "CosyVoice":
+        # 获取 CosyVoice 的源码根目录 (src/audio/cosyvoice)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        cosyvoice_root = os.path.join(current_dir, "cosyvoice")
+        
+        # 调用我们新建文件里的函数
+        fix_msg = patch_cosyvoice_code(cosyvoice_root)
+        
+        if fix_msg:
+            log_content += f"\n{fix_msg}"
+            yield log_content, "🔧 修复兼容性..."
+    # ===============================================================
+
     try:
         generator = AudioEngineFactory.get_engine_stream(engine_type, full_path)
         for item in generator:
@@ -131,7 +152,6 @@ def load_and_save_stream_handler(engine_type, model_name, ref_audio, ref_text):
                 log_content += item
                 yield log_content, "⏳ 处理中..."
             elif item is None:
-                # === 🛠️ 修复点：之前这里写成了逗号分隔，导致变成了 Tuple ===
                 log_content += "\n❌ 加载失败，请检查日志。"
                 yield log_content, "❌ 失败"
             else:
@@ -139,7 +159,6 @@ def load_and_save_stream_handler(engine_type, model_name, ref_audio, ref_text):
                 log_content += "\n🎉 引擎加载成功！"
                 yield log_content, "✅ 就绪"
     except Exception as e:
-        # === 🛡️ 错误捕获 ===
         import traceback
         traceback.print_exc()
         log_content += f"\n❌ 崩溃: {str(e)}"
@@ -153,7 +172,7 @@ def auto_extract_text_from_filename(audio_path):
     except: return ""
 
 # ==========================================
-# 3. UI 构建主函数
+# 3. UI 构建主函数 (UI 布局部分几乎不用动)
 # ==========================================
 
 def build_audio_ui():
@@ -166,7 +185,8 @@ def build_audio_ui():
     if initial_choices == [PLACEHOLDER_TEXT]:
         default_model_value = initial_choices[0]
     else:
-        default_model_value = last_model_name if last_model_name in initial_choices else initial_choices[0]
+        last_model_basename = os.path.basename(last_model_name)
+        default_model_value = last_model_basename if last_model_basename in initial_choices else initial_choices[0]
 
     raw_audio_path = config.get("ref_audio")
     if raw_audio_path and os.path.isfile(raw_audio_path):
@@ -192,7 +212,7 @@ def build_audio_ui():
                         install_btn = gr.Button("🚀 执行安装/修复", variant="primary")
                 
                 with gr.Tab("📥 下载模型权重"):
-                    gr.Markdown("有了源码还需要模型文件 (如 300M 版本)。")
+                    gr.Markdown("注意：模型将直接下载到源码目录的 pretrained_models 文件夹。")
                     with gr.Row():
                         source_radio = gr.Radio(["ModelScope", "HuggingFace"], value="ModelScope", label="下载源")
                         dl_model_select = gr.Dropdown(

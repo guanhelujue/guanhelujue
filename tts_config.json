@@ -1,0 +1,6 @@
+{
+    "model_path": "CosyVoice-300M",
+    "ref_audio": "C:\\Users\\叶程轶\\AppData\\Local\\Temp\\gradio\\cfb90c14e8aa301b8a172607f5822a32217795f9b04271a8005b6b35b647b96d\\班尼特所以我们现在可能是被困在这里了真苦恼啊哈哈.wav",
+    "ref_text": "所以我们现在可能是被困在这里了真苦恼啊哈哈...",
+    "engine_type": "CosyVoice"
+}

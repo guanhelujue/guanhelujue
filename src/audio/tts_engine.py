@@ -67,5 +67,3 @@ class TTSEngine:
             import traceback
             traceback.print_exc()
             return None
-
-# 这里不需要 if __name__ == "__main__" 测试代码，因为外部调用逻辑变了

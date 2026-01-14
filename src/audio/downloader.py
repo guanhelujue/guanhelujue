@@ -7,7 +7,7 @@ MODEL_MAP = {
         "ms": "iic/CosyVoice-300M",
         "hf": "FunAudioLLM/CosyVoice-300M",
         "dir": "CosyVoice-300M",
-        "engine": "CosyVoice" # 标记所属引擎
+        "engine": "CosyVoice"
     },
     "CosyVoice-300M-SFT (微调版)": {
         "ms": "iic/CosyVoice-300M-SFT",
@@ -37,7 +37,7 @@ MODEL_MAP = {
 
 def download_model_handler(source_type, model_key):
     """
-    下载处理器 (生成器函数，用于实时返回日志)
+    下载处理器 (修复版：修正路径计算)
     """
     if not model_key:
         yield "⚠️ 请先选择要下载的模型！"
@@ -48,49 +48,61 @@ def download_model_handler(source_type, model_key):
         yield "❌ 未知的模型 Key"
         return
 
-    # === 路径计算优化 ===
-    # 目标结构: assets/models/{EngineName}/{ModelName}
-    
+    # === 路径计算 (关键修复点) ===
+    # 当前文件在 src/audio/downloader.py
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(current_dir))
     
-    # 1. 基础模型目录 assets/models
-    base_models_dir = os.path.join(project_root, "assets", "models")
-    
-    # 2. 引擎专属目录 (例如 assets/models/CosyVoice)
-    engine_sub_dir = model_info.get("engine", "Others") 
-    final_parent_dir = os.path.join(base_models_dir, engine_sub_dir)
-    
-    # 3. 最终模型目录
-    target_dir = os.path.join(final_parent_dir, model_info['dir'])
+    if model_info["engine"] == "CosyVoice":
+        # ✅ 修正：既然 current_dir 已经是 src/audio 了，就不要再拼 "audio" 了
+        cosyvoice_root = os.path.join(current_dir, "cosyvoice")
+        pretrained_root = os.path.join(cosyvoice_root, "pretrained_models")
+        
+        # 检查源码是否存在
+        if not os.path.exists(cosyvoice_root):
+             yield f"❌ 错误：未检测到 CosyVoice 源码目录。\n扫描路径: {cosyvoice_root}\n请先在【下载/修复引擎】中安装源码。"
+             return
+    else:
+        # 回退逻辑 (assets/models)
+        # src/audio -> src -> project_root
+        project_root = os.path.dirname(os.path.dirname(current_dir))
+        pretrained_root = os.path.join(project_root, "assets", "models", "Others")
 
-    repo_id = model_info["ms"] if source_type == "ModelScope (国内推荐)" else model_info["hf"]
+    target_dir = os.path.join(pretrained_root, model_info['dir'])
+
+    repo_id = model_info["ms"] if source_type == "ModelScope" else model_info["hf"]
     
     yield f"🚀 准备从 {source_type} 下载..."
     yield f"📦 模型 ID: {repo_id}"
     yield f"📂 存放路径: {target_dir}"
-    yield "⏳ 正在初始化下载进程 (如果模型很大，请耐心等待控制台输出进度)..."
+    
+    # 自动创建父目录
+    if not os.path.exists(pretrained_root):
+        try:
+            os.makedirs(pretrained_root, exist_ok=True)
+        except:
+            yield f"❌ 无法创建目录: {pretrained_root}"
+            return
+
+    yield "⏳ 正在初始化下载进程..."
 
     try:
-        if source_type == "ModelScope (国内推荐)":
+        if source_type == "ModelScope":
             try:
                 from modelscope import snapshot_download
             except ImportError:
-                yield "❌ 缺少 modelscope 库。请在终端运行: pip install modelscope"
+                yield "❌ 缺少 modelscope 库。请先修复引擎环境。"
                 return
-            
             snapshot_download(repo_id, local_dir=target_dir)
             
         else: # HuggingFace
             try:
                 from huggingface_hub import snapshot_download
             except ImportError:
-                yield "❌ 缺少 huggingface_hub 库。请在终端运行: pip install huggingface_hub"
+                yield "❌ 缺少 huggingface_hub 库。请运行 pip install huggingface_hub"
                 return
-            
             snapshot_download(repo_id, local_dir=target_dir)
 
-        yield f"✅ 下载完成！\n📁 模型已保存在: {target_dir}\n🔄 请在 Step 2 点击刷新按钮加载新模型。"
+        yield f"✅ 下载完成！\n📁 模型已保存在源码目录中: {target_dir}"
 
     except Exception as e:
-        yield f"❌ 下载失败: {str(e)}\n(请检查网络连接或磁盘空间)"
+        yield f"❌ 下载失败: {str(e)}\n(请检查网络连接)"

@@ -1,0 +1,21 @@
+# ==========================================
+# Musetalk 专属依赖 (Audio 2 Face)
+# ==========================================
+# 只有在启用Musetalk 模式时才需要安装这些
+# 核心环境 (Torch/Numpy) 默认继承自主环境
+
+
+opencv-python==4.9.0.80
+imageio[ffmpeg]
+ffmpeg-python
+moviepy
+soundfile==0.12.1
+librosa==0.11.0
+yapf==0.43.0
+addict==2.4.0
+termcolor==3.3.0
+xtcocotools==1.14.3
+pycocotools==2.0.11
+shapely==2.1.2
+munkres==1.1.4
+terminaltables==3.1.10

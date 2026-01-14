@@ -1,14 +1,15 @@
+import matplotlib
+matplotlib.use('Agg')
 import gradio as gr
 import sys
 import os
-
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from configs.ui import build_config_ui
 from src.audio.ui import build_audio_ui, get_tts
 from src.brain.ui import build_brain_ui, user_input_handler, brain_think_handler
-from src.avatar.ui import build_avatar_ui, get_current_avatar
-from src.video.engine import get_sadtalker
+from src.avatar.ui import build_avatar_ui, get_current_avatar, load_a2f_config
+from src.avatar.engine import get_engine
 
 # === 桥接函数 ===
 def tts_bridge(text, ref_audio, ref_text):
@@ -19,20 +20,35 @@ def tts_bridge(text, ref_audio, ref_text):
     return tts.speak(text, ref_audio, ref_text, output_file=output_path)
 
 def video_bridge(audio_path):
-    """
-    连接 TTS 音频 -> SadTalker 视频
-    """
-    if not audio_path: return None
+    # 1. 直接从 JSON 文件读取最新的配置
+    config = load_a2f_config()
     
-    # 获取当前头像
-    source_image = get_current_avatar()
-    if not source_image:
-        print("⚠️ 未设置头像，无法生成视频")
-        return None
-        
-    engine = get_sadtalker()
-    # 生成视频
-    video_path = engine.generate(source_image, audio_path)
+    engine_name = config.get("engine", "SadTalker")
+    img_path = config.get("img")
+
+    if not img_path:
+        raise ValueError("请先在'形象激活'面板上传图片并点击'激活配置'")
+
+    # 2. 传入引擎名称，修复 TypeError
+    engine = get_engine(engine_name)
+    
+    # 3. 根据不同引擎传入对应参数
+    if engine_name == "SadTalker":
+        video_path = engine.generate(
+            img=img_path, 
+            audio=audio_path, 
+            out_dir="results",
+            use_still=config.get("still", False),
+            use_enhancer=config.get("enhancer", True)
+        )
+    elif engine_name == "MuseTalk":
+        video_path = engine.generate(
+            img=img_path, 
+            audio=audio_path, 
+            out_dir="results",
+            bbox_shift=config.get("bbox", 0)
+        )
+    
     return video_path
 
 def create_ui():
@@ -64,7 +80,7 @@ def create_ui():
                     
                     # 右侧：对话框
                     with gr.Column(scale=2):
-                        chatbot, msg_input, submit_btn, clear_btn, _ = build_brain_ui()
+                        chatbot, msg_input, submit_btn, clear_btn = build_brain_ui()
 
         # === 核心处理链 ===
         def processing_chain(history, ref_audio, ref_text):
@@ -83,7 +99,6 @@ def create_ui():
             
             # 3. 演戏 (生成视频)
             if audio_path:
-                print("🎬 正在渲染 SadTalker 视频，这需要一点时间...")
                 video_path = video_bridge(audio_path)
                 if video_path:
                     # 播放视频

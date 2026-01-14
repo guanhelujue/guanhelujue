@@ -2,7 +2,6 @@
 conda create -n guanhelujue python=3.10
 conda activate guanhelujue
 pip install -r requirements.txt
-pip install --no-deps -r requirements-nodeps.txt
 ```
 
 
@@ -27,6 +26,3 @@ raise 'can not detect the landmark from source image'
 # 🟢 修正代码
 raise Exception('can not detect the landmark from source image')
 ```
-
-
-
